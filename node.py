@@ -39,15 +39,15 @@ class Node(Process):
         self.receive_socket = context.socket(zmq.SUB)
 
         # Send sockets bind to a specific port based on the priority of the node
-        send_port = send_base_port + self.priority
-        self.send_socket.bind('tcp://*:{}'.format(send_port))
+        receive_port = receive_base_port + self.priority
+        self.receive_socket.bind('tcp://*:{}'.format(receive_port))
 
         # Receive sockets bind to all nodes
         for priority, ip in enumerate(nodes_ips):
             if priority != self.priority:
                 ip = nodes_ips[priority]
-                port = send_base_port + priority
-                self.receive_socket.connect('tcp://{0}:{1}'.format(ip, port))
+                port = receive_base_port + priority
+                self.send_socket.connect('tcp://{0}:{1}'.format(ip, port))
 
         self.receive_socket.subscribe(bytes([MessageTypes.LEADER]))
 

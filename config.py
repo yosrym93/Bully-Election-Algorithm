@@ -4,7 +4,7 @@ class MessageTypes:
     LEADER = 3
 
 
-send_base_port = 5000
+receive_base_port = 5000
 server_port = 6000
 
 leader_request_timeout = 1000
