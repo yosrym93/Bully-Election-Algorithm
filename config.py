@@ -5,12 +5,13 @@ class MessageTypes:
 
 
 receive_base_port = 5000
-server_port = 6000
+server_base_port = 6000
 
-leader_request_timeout = 1000
-election_reply_timeout = 1000
+leader_request_timeout = 3
+election_reply_timeout = 1
 
 nodes_ips = [
+    '127.0.0.1',
     '127.0.0.1',
     '127.0.0.1',
     '127.0.0.1'
