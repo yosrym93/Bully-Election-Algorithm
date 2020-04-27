@@ -14,7 +14,6 @@ class SwitchToNodeException(Exception):
 
 class Node:
     def __init__(self, priority, leader):
-
         self.priority = priority
         self.leader_priority = leader
 
@@ -97,6 +96,7 @@ class Node:
             self.client_socket.recv_string()
 
         except zmq.error.Again:
+            print('{}: Leader reply timeout'.format(self.priority))
             # If the leader does not respond within a timeout, start a new election
             new_leader_elected = False
             while not new_leader_elected:
@@ -105,9 +105,9 @@ class Node:
     def serve_node_request(self):
         # If any node sent a request, respond to it
         try:
-            self.server_socket.recv_string(flags=zmq.NOBLOCK)
+            node_priority = self.server_socket.recv_string(flags=zmq.NOBLOCK)
             self.server_socket.send_string(str(self.priority))
-
+            print('{0}: Request from node {1} served'.format(self.priority, node_priority))
         except zmq.error.Again:
             return
 
@@ -134,6 +134,7 @@ class Node:
                 if message_type == MessageTypes.ELECTION_REPLY:
                     reply_received = True
                 elif message_type == MessageTypes.LEADER:
+                    print('{}: Leader elected'.format(self.priority))
                     self.handle_leader_message(leader_priority=priority)
                     return True
                 elif message_type == MessageTypes.ELECTION_START:
@@ -150,17 +151,17 @@ class Node:
                 try:
                     message_type, priority = self.receive_socket.recv(flags=zmq.NOBLOCK)
                     if message_type == MessageTypes.LEADER:
+                        print('{}: Leader elected'.format(self.priority))
                         self.handle_leader_message(leader_priority=priority)
                         return True
                     elif message_type == MessageTypes.ELECTION_START:
-
                         self.send_socket.send(bytes([MessageTypes.ELECTION_REPLY, priority]))
                 except zmq.error.Again:
                     continue
 
         # If none of the higher priority node responds, become the leader
         else:
-            print('{}: Switching to leader'.format(self.priority))
+            print('{}: No higher nodes available, declaring node as leader'.format(self.priority))
             self.send_leader_message()
             raise SwitchToLeaderException
 
@@ -185,6 +186,7 @@ class Node:
                 message_type, priority = self.receive_socket.recv(flags=zmq.NOBLOCK)
                 if message_type == MessageTypes.LEADER:
                     if priority > self.priority:
+                        print('{}: A node with a higher priority declared leadership'.format(self.priority))
                         self.leader_priority = priority
                         raise SwitchToNodeException
 
@@ -203,6 +205,7 @@ class Node:
                 message_type, priority = self.receive_socket.recv(flags=zmq.NOBLOCK)
 
                 if message_type == MessageTypes.ELECTION_START:
+                    print('{0}: Election requested by node {1}.'.format(self.priority, priority))
                     self.send_socket.send(bytes([MessageTypes.ELECTION_REPLY, priority]))
                     self.start_election()
                 elif message_type == MessageTypes.LEADER:
@@ -210,6 +213,9 @@ class Node:
 
             except zmq.error.Again:
                 continue
+
+            finally:
+                time.sleep(0.5)
 
     def run(self):
         is_leader = self.priority == self.leader_priority
@@ -222,9 +228,11 @@ class Node:
                     self.init_node_sockets()
                     self.run_node()
             except SwitchToNodeException:
+                print('{}: Switching to node'.format(self.priority))
                 self.destroy_leader_sockets()
                 is_leader = False
             except SwitchToLeaderException:
+                print('{}: Switching to leader'.format(self.priority))
                 self.destroy_node_sockets()
                 is_leader = True
                 self.leader_priority = self.priority
